@@ -18,8 +18,6 @@ class TLP(object):
 	::param G_learners: a list of strings for the abbreviations of the learners to be included in the treatment G SL
 	::param outcome_type: a string 'reg' or 'cls' incicating whether the outcome is binary or continuous
 	::param: outcome_upper_bound, outcome_lower_bound: floats for the upper and lower bound of the outcomes for rescaling to [0,1]
-
-	NOTE: THE GROUP NAMES FOR THE TREATMENT MUST BE INDEXED WITH INTEGERS STARTING FROM 0
 	'''
 
 	def __init__(self, data, cause, outcome, confs, precs, Q_learners, G_learners, outcome_type='reg',
@@ -92,11 +90,13 @@ class TLP(object):
 
 		# QAW PREDS
 		print('Generating QAW Predictions ')
-		self.QAW = self.qslr.predict(self.Q_X)[:, 0] if self.outcome_type == 'reg' else self.qslr.predict_proba(
+		QAW = self.qslr.predict(self.Q_X)[:, 0] if self.outcome_type == 'reg' else self.qslr.predict_proba(
 			self.Q_X)[:, 1]
+		self.QAW = np.clip(QAW, 0.025, 0.975) if (self.outcome_type == 'cls') or (self.outcome_upper_bound is not None) else QAW
+
 		if self.outcome_upper_bound is not None and self.outcome_type == 'reg':
 			print('Bounding outcome predictions.')
-			self.QAW = np.clip(self.QAW, 0, 1)
+			self.QAW = np.clip(self.QAW, 0.025, 0.975)
 
 		print('Training G Learners...')
 		self.gslr = SuperLearner(output='proba', calibration=calibration, learner_list=self.G_learners, k=k,
@@ -105,7 +105,7 @@ class TLP(object):
 
 		# PROPENSITY SCORES
 		print('Generating G Predictions ')
-		self.Gpreds = self.gslr.predict_proba(self.G_X)
+		self.Gpreds = np.clip(self.gslr.predict_proba(self.G_X), 0.025, 0.975)
 
 		print('SuperLearner Training Completed.')
 		self.Qbeta = self.qslr.beta
@@ -126,9 +126,10 @@ class TLP(object):
 		for group in self.groups:
 			int_data = self.Q_X.copy()
 			int_data[self.cause] = group
-			self.Qpred_groups[group] = self.qslr.predict(int_data)[:,
+			qps = self.qslr.predict(int_data)[:,
 			                           0] if self.outcome_type == 'reg' else self.qslr.predict_proba(int_data)[:, 1]
 
+			self.Qpred_groups[group] = np.clip(qps, 0.025, 0.975) if (self.outcome_type == 'cls') or (self.outcome_upper_bound is not None) else qps
 		# GROUP DIFFERENCES
 		for group_comparison in group_comparisons:
 			group_a = group_comparison[0]
@@ -154,6 +155,7 @@ class TLP(object):
 		print('Estimating Fluctuation Parameters')
 		for group_comparison in group_comparisons:
 			group_clev_cov = self.clev_covs[str(group_comparison)][0]
+
 			if self.outcome_type == 'cls' or self.outcome_upper_bound is not None:
 				eps = sm.GLM(np.asarray(self.Q_Y).astype('float'), group_clev_cov, offset=logit(self.QAW),
 				             family=sm.families.Binomial()).fit().params[0]
