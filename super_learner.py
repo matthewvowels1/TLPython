@@ -47,8 +47,8 @@ class SuperLearner(object):
 		self.num_classes = None
 
 	def fit(self, x, y):
-		x = x.values if isinstance(x, pd.DataFrame) else x
-		y = y.values[:, 0] if isinstance(y, pd.DataFrame) else y
+		x = x.values.astype('float') if isinstance(x, pd.DataFrame) else x
+		y = y.values[:, 0].astype('float') if isinstance(y, pd.DataFrame) else y
 
 		# mean and std for full dataset (can be reused wth new data at prediction time)
 		self.x_std = x.std(0)
@@ -59,12 +59,9 @@ class SuperLearner(object):
 			self.y_mean = y.mean(0)
 
 		if (self.output == 'cls') or (self.output == 'proba'):
-			self.num_classes = np.unique(y)
+			self.num_classes = len(np.unique(y))
 
-			if len(self.num_classes) == 2:
-				self.num_classes = 1
-			elif len(self.num_classes) > 2:
-				self.num_classes = len(self.num_classes)
+			if self.num_classes > 2:
 				self.output = 'cat'
 		else:
 			self.num_classes = 1
@@ -75,7 +72,7 @@ class SuperLearner(object):
 
 		i = 0
 		for key in self.est_dict.keys():
-			print('Training estimator:', key)
+
 
 			est = self.est_dict[key]
 
@@ -133,7 +130,7 @@ class SuperLearner(object):
 			y = (y - self.y_mean) / self.y_std
 
 		for key in self.est_dict.keys():
-			print('Training estimator on full data:', key)
+
 
 			est = self.est_dict[key]
 
@@ -151,7 +148,7 @@ class SuperLearner(object):
 			self.est_dict[key] = est
 
 	def predict(self, x):
-		x = x.values if isinstance(x, pd.DataFrame) else x
+		x = x.values.astype('float') if isinstance(x, pd.DataFrame) else x
 		x_ = (x - self.x_mean) / self.x_std
 		all_preds = np.zeros((len(x_), len(self.est_dict)))
 		i = 0
@@ -175,7 +172,7 @@ class SuperLearner(object):
 		return weighted_preds
 
 	def predict_proba(self, x):
-		x = x.values if isinstance(x, pd.DataFrame) else x
+		x = x.values.astype('float') if isinstance(x, pd.DataFrame) else x
 
 		x_ = (x - self.x_mean) / self.x_std
 
