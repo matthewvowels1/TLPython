@@ -18,6 +18,8 @@ class TLP(object):
 	::param G_learners: a list of strings for the abbreviations of the learners to be included in the treatment G SL
 	::param outcome_type: a string 'reg' or 'cls' incicating whether the outcome is binary or continuous
 	::param: outcome_upper_bound, outcome_lower_bound: floats for the upper and lower bound of the outcomes for rescaling to [0,1]
+
+	NOTE: THE GROUP NAMES FOR THE TREATMENT MUST BE INDEXED WITH INTEGERS STARTING FROM 0
 	'''
 
 	def __init__(self, data, cause, outcome, confs, precs, Q_learners, G_learners, outcome_type='reg',

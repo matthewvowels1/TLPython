@@ -9,6 +9,8 @@ Targeted Learning for Binary and Categorical Treatment
 from TLP import TLP
 from helper import generate_data
 
+# NOTE: THE GROUP NAMES FOR THE TREATMENT MUST BE INDEXED WITH INTEGERS STARTING FROM 0
+
 est_dict_Q = ['Elastic', 'BR', 'SV', 'LR', 'RF', 'MLP', 'AB', 'poly']
 est_dict_G = ['LR', 'NB', 'MLP','SV', 'poly', 'RF','AB']
 
