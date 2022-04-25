@@ -41,6 +41,7 @@ def combiner_solve(x, y):
 class SuperLearner(object):
 	def __init__(self, output, k, standardized_outcome=False, calibration=True, learner_list=None ):
 		self.learner_list = learner_list
+		self.num_learners = len(learner_list)
 		self.k = k  # number of cross validation folds
 		self.beta = None
 		self.output = output  # 'reg' for regression, 'proba' or 'cls' classification
@@ -59,7 +60,14 @@ class SuperLearner(object):
 		est_dict = {}
 		for learner in self.learner_list:
 			if learner == 'Elastic':
-				est_dict[learner] = ElasticNet()
+				l = 'Elastic0.25'
+				est_dict[l] = ElasticNet(alpha=0.25)
+				l = 'Elastic0.5'
+				est_dict[l] = ElasticNet(alpha=0.5)
+				l = 'Elastic0.75'
+				est_dict[l] = ElasticNet(alpha=0.75)
+				l = 'Elastic1'
+				est_dict[l] = ElasticNet(alpha=0.1)
 			elif learner == 'LR':
 				if ((self.output == 'cls') or (
 						self.output == 'proba') or (self.output == 'cat')):
@@ -83,7 +91,7 @@ class SuperLearner(object):
 						self.output == 'proba') or (self.output == 'cat')):
 					est_dict[learner] = AdaBoostClassifier()
 				else:
-					est_dict[learner] =  AdaBoostRegressor()
+					est_dict[learner] = AdaBoostRegressor()
 
 			elif learner == 'RF':
 				if ((self.output == 'cls') or (
@@ -103,6 +111,7 @@ class SuperLearner(object):
 				est_dict[learner] = 'poly'
 
 		self.est_dict = est_dict
+		self.num_learners = len(list(self.est_dict.keys()))
 
 
 	def fit(self, x, y):
@@ -132,7 +141,7 @@ class SuperLearner(object):
 		else:
 			kf = KFold(n_splits=self.k, shuffle=True, random_state=0)
 
-		all_preds = np.zeros((len(y), len(self.learner_list)))  # for test preds
+		all_preds = np.zeros((len(y), self.num_learners))  # for test preds
 
 		i = 0
 		for key in tqdm(self.learner_list):
@@ -222,7 +231,7 @@ class SuperLearner(object):
 	def predict(self, x):
 		x = x.values.astype('float') if isinstance(x, pd.DataFrame) else x
 		x_ = (x - self.x_mean) / self.x_std
-		all_preds = np.zeros((len(x_), len(self.learner_list)))
+		all_preds = np.zeros((len(x_), self.num_learners))
 		i = 0
 
 		for key in self.est_dict.keys():
@@ -248,7 +257,7 @@ class SuperLearner(object):
 
 		x_ = (x - self.x_mean) / self.x_std
 
-		all_preds = np.zeros((len(x), self.num_classes, len(self.est_dict)))
+		all_preds = np.zeros((len(x), self.num_classes, self.num_learners))
 		i = 0
 
 		for key in self.est_dict.keys():
