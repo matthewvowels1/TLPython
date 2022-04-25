@@ -2,7 +2,7 @@
 Targeted Learning for Binary and Categorical Treatment
 
 
-## Example Usage
+## Example Usage:
 
 
 ```python
