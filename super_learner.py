@@ -112,6 +112,7 @@ class SuperLearner(object):
 
 		self.est_dict = est_dict
 		self.num_learners = len(list(self.est_dict.keys()))
+		self.learner_list = list(self.est_dict.keys())
 
 
 	def fit(self, x, y):
@@ -140,6 +141,8 @@ class SuperLearner(object):
 			kf = StratifiedKFold(n_splits=self.k, shuffle=True, random_state=0)
 		else:
 			kf = KFold(n_splits=self.k, shuffle=True, random_state=0)
+
+		self._init_learners()
 
 		all_preds = np.zeros((len(y), self.num_learners))  # for test preds
 

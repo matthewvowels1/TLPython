@@ -82,14 +82,6 @@ class TLP(object):
 		::returns all_preds_Q, gts_Q, all_preds_G, gts_G: arrays of test-fold predictions and GT for Q and G models
 		'''
 
-		print('Training G Learners...')
-		self.gslr = SuperLearner(output='proba', calibration=calibration, learner_list=self.G_learners, k=k,
-		                         standardized_outcome=standardized_outcome)
-		all_preds_G, gts_G = self.gslr.fit(x=self.G_X, y=self.G_Y)
-
-		# PROPENSITY SCORES
-		print('Generating G Predictions ')
-		self.Gpreds = self.gslr.predict_proba(self.G_X)
 
 		print('Training Q Learners...')
 		self.qslr = SuperLearner(output=self.outcome_type, calibration=calibration, learner_list=self.Q_learners, k=k,
@@ -103,6 +95,15 @@ class TLP(object):
 		if self.outcome_upper_bound is not None and self.outcome_type == 'reg':
 			print('Bounding outcome predictions.')
 			self.QAW = np.clip(self.QAW, 0, 1)
+
+		print('Training G Learners...')
+		self.gslr = SuperLearner(output='proba', calibration=calibration, learner_list=self.G_learners, k=k,
+		                         standardized_outcome=standardized_outcome)
+		all_preds_G, gts_G = self.gslr.fit(x=self.G_X, y=self.G_Y)
+
+		# PROPENSITY SCORES
+		print('Generating G Predictions ')
+		self.Gpreds = self.gslr.predict_proba(self.G_X)
 
 		print('SuperLearner Training Completed.')
 		self.Qbeta = self.qslr.beta
