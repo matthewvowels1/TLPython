@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from super_learner import*
 import statsmodels.api as sm
-from scipy.stats import norm, t
+from scipy.stats import norm
 from scipy.special import logit, expit
 import random
 
@@ -195,7 +195,7 @@ class TLP(object):
 			IC = clev_cov_group * (self.Q_Y.values - self.QAW) + (ystar_a - ystar_ref) - effect_star
 			IC_var = np.var(IC, ddof=1)
 			se = (IC_var / self.n) ** 0.5
-			p = 2 * (1 - t.cdf(np.abs(effect_star) / se, 2 * self.n))
+			p = 2 * (1 - norm.cdf(np.abs(effect_star) / se))
 			self.ses[str(group_comparison)] = se
 			self.ps[str(group_comparison)] = p
 
