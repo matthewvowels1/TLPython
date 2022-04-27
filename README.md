@@ -63,11 +63,12 @@ print(true_psi_1_0, true_psi_2_0, true_psi_3_0)
 - Highly Adaptive Lasso [6]
 
 
-## Theory:
-Consider an outcome $Y$, treatment $A$, a set of $k$ confounding covariates $\mathbf{X}$, and a set of $d$ `risk' variables $\mathbf{R}$ which are related to the outcome $Y$ but not to treatment $A$ which aid in precision estimation. Assume we have $N$ samples from this joint distribution $\{y_i, a_i, \mathbf{x}_i, \mathbf{r}_i \}_{i=1}^N $.
+### Assumed Graph:
 
 ![Fig. 1](https://github.com/matthewvowels1/TLPython/blob/main/dag.png)
-According to the assumed structure of the DAG in Fig. 1 , the joint distribution factorises as:
+
+Note that in the absence of the arrow X -> A (i.e. confounder to treatment assignment) we default to esimtation of the conditional outcome mean difference, 
+for which the influence function takes a similar form (see [9] for a derivation).
 
 ### References
 [1.] Van der Laan, M. J., & Rose, S. (2011). Targeted learning: causal inference for observational and experimental data (Vol. 4). New York: Springer
@@ -86,4 +87,5 @@ According to the assumed structure of the DAG in Fig. 1 , the joint distribution
 
 [8.] van der Laan, M. J., & Gruber, S. (2012). Targeted minimum loss based estimation of causal effects of multiple time point interventions. The international journal of biostatistics, 8(1).
 
+[9.] Hines, O., Dukes, O., Diaz-Ordaz, K., & Vansteelandt, S. (2022). Demystifying statistical learning based on efficient influence functions. The American Statistician, 1-13.
 
