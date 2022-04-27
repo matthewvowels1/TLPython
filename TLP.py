@@ -121,7 +121,7 @@ class TLP(object):
 			else:
 				unique, counts = np.unique(self.G_Y, return_counts=True)
 
-			self.Gpreds = np.repeat((counts/len(self.G_Y)).reshape(1, -1), len(self.G_Y) , axis=0)
+			self.Gpreds = np.repeat(np.clip(counts/len(self.G_Y), 0.025, 0.975).reshape(1, -1), len(self.G_Y), axis=0)
 
 		return all_preds_Q, gts_Q, all_preds_G, gts_G
 
