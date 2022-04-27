@@ -63,6 +63,12 @@ print(true_psi_1_0, true_psi_2_0, true_psi_3_0)
 - Highly Adaptive Lasso [6]
 
 
+## Theory:
+Consider an outcome $Y$, treatment $A$, a set of $k$ confounding covariates $\mathbf{X}$, and a set of $d$ `risk' variables $\mathbf{R}$ which are related to the outcome $Y$ but not to treatment $A$ which aid in precision estimation. Assume we have $N$ samples from this joint distribution $\{y_i, a_i, \mathbf{x}_i, \mathbf{r}_i \}_{i=1}^N $.
+
+![Fig. 1](https://github.com/matthewvowels1/TLPython/blob/main/dag.png)
+According to the assumed structure of the DAG in Fig. 1 , the joint distribution factorises as:
+
 ### References
 [1.] Van der Laan, M. J., & Rose, S. (2011). Targeted learning: causal inference for observational and experimental data (Vol. 4). New York: Springer
 

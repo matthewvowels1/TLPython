@@ -38,6 +38,7 @@ class TLP(object):
 
 		self.Q_X = self.data[list(set(confs)) + list(set(precs)) + [cause]]
 		self.G_X = self.data[list(set(confs))]
+		self.num_confs = len(list(set(confs)))
 		self.Q_Y = self.data[outcome].astype('int') if outcome_type == 'cls' else self.data[outcome]
 		self.G_Y = self.data[cause]
 
@@ -98,18 +99,29 @@ class TLP(object):
 			print('Bounding outcome predictions.')
 			self.QAW = np.clip(self.QAW, 0.025, 0.975)
 
-		print('Training G Learners...')
-		self.gslr = SuperLearner(output='proba', calibration=calibration, learner_list=self.G_learners, k=k,
-		                         standardized_outcome=standardized_outcome)
-		all_preds_G, gts_G = self.gslr.fit(x=self.G_X, y=self.G_Y)
-
+		all_preds_G, gts_G = None, None
 		# PROPENSITY SCORES
-		print('Generating G Predictions ')
-		self.Gpreds = np.clip(self.gslr.predict_proba(self.G_X), 0.025, 0.975)
+		if self.num_confs != 0:
+			print('Training G Learners...')
+			self.gslr = SuperLearner(output='proba', calibration=calibration, learner_list=self.G_learners, k=k,
+			                         standardized_outcome=standardized_outcome)
+			all_preds_G, gts_G = self.gslr.fit(x=self.G_X, y=self.G_Y)
+			print('Generating G Predictions ')
+			self.Gpreds = np.clip(self.gslr.predict_proba(self.G_X), 0.025, 0.975)
 
-		print('SuperLearner Training Completed.')
-		self.Qbeta = self.qslr.beta
-		self.Gbeta = self.gslr.beta
+			print('SuperLearner Training Completed.')
+			self.Qbeta = self.qslr.beta
+			self.Gbeta = self.gslr.beta
+
+		else:
+			print('No confounders, computing marginal probabilities of treatment.')
+			if (self.G_Y, pd.DataFrame) or isinstance(self.G_Y, pd.DataFrame):
+				unique, counts = np.unique(self.G_Y.values, return_counts=True)
+
+			else:
+				unique, counts = np.unique(self.G_Y, return_counts=True)
+
+			self.Gpreds = np.repeat((counts/len(self.G_Y)).reshape(1, -1), len(self.G_Y) , axis=0)
 
 		return all_preds_Q, gts_Q, all_preds_G, gts_G
 
@@ -142,6 +154,7 @@ class TLP(object):
 			self.first_estimates[str(group_comparison)] = difference
 
 		# CLEVER COVARIATES
+
 		print('Estimating Clever Covariates')
 		for group_comparison in group_comparisons:
 			group_a = group_comparison[0]
@@ -150,6 +163,7 @@ class TLP(object):
 			group_clev_cov = ((self.A_dummys.iloc[:, group_a] / self.Gpreds[:, group_a]) - (
 						1 - self.A_dummys.iloc[:, group_a]) / (1 - self.Gpreds[:, group_a])).values
 			self.clev_covs[str(group_comparison)] = (group_clev_cov, group_a_inv_prop, group_not_a_inv_prop)
+
 
 		# ESTIMATE FLUCTUATION PARAMETERS
 		print('Estimating Fluctuation Parameters')
@@ -172,6 +186,7 @@ class TLP(object):
 			group_ref_orig = self.Qpred_groups[group_ref]
 
 			self.first_effects[str(group_comparison)] = group_a_orig.mean() - group_ref_orig.mean()
+
 			eps = self.epsilons[str(group_comparison)]
 			clev_cov_a = self.clev_covs[str(group_comparison)][1]
 			clev_cov_ref = self.clev_covs[str(group_comparison)][2]
@@ -186,18 +201,24 @@ class TLP(object):
 			self.updated_estimates[str(group_comparison)] = (group_a_update, group_ref_update)
 			self.updated_effects[str(group_comparison)] = (group_a_update - group_ref_update).mean()
 
-		print('Deriving the Influence Function')
+		print('Deriving the Influence Function, standard error, CI bounds and p-values')
 		for group_comparison in group_comparisons:
 			clev_cov_group = self.clev_covs[str(group_comparison)][0]
 			ystar_a, ystar_ref = self.updated_estimates[str(group_comparison)][0], \
 			                     self.updated_estimates[str(group_comparison)][1]
 			effect_star = self.updated_effects[str(group_comparison)]
 			IC = clev_cov_group * (self.Q_Y.values - self.QAW) + (ystar_a - ystar_ref) - effect_star
-			IC_var = np.var(IC, ddof=1)
-			se = (IC_var / self.n) ** 0.5
-			p = 2 * (1 - norm.cdf(np.abs(effect_star) / se))
-			self.ses[str(group_comparison)] = se
+			se, p, upper_bound, lower_bound = self._inference(ic=IC, effect=effect_star)
+			self.ses[str(group_comparison)] = (se, upper_bound, lower_bound)
 			self.ps[str(group_comparison)] = p
 
+
 		return self.first_effects, self.updated_effects, self.ses, self.ps
+
+	def _inference(self, ic, effect):
+		IC_var = np.var(ic, ddof=1)
+		se = (IC_var / self.n) ** 0.5
+		p = 2 * (1 - norm.cdf(np.abs(effect) / se))
+		upper_bound, lower_bound = (effect + 1.96 * se), (effect - 1.96 * se)
+		return se, p, upper_bound, lower_bound
 
