@@ -48,7 +48,7 @@ tlp = TLP(data, cause='A', outcome='Y', confs=['W1', 'W2', 'W3', 'W4'],
 # fit SuperLearners
 all_preds_Q, gts_Q, all_preds_G, gts_G = tlp.fit(k=k, standardized_outcome=False, calibration=True)
 
-# 'do' targeted learning
+# 'do' targeted learning, NB ses contains a tuple of (standard error, upper bound CI, lower bound CI)
 pre_update_effects, post_update_effects, ses, ps = tlp.target_multigroup(group_comparisons=group_comparisons)
 
 # compare results

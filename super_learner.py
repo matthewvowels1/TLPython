@@ -120,6 +120,9 @@ class SuperLearner(object):
 		x = x.values.astype('float') if isinstance(x, pd.DataFrame) else x
 		y = y.values[:, 0].astype('float') if isinstance(y, pd.DataFrame) else y
 
+		x = x.values.astype('float') if isinstance(x, pd.Series) else x
+		y = y.values.astype('float') if isinstance(y, pd.Series) else y
+
 		# mean and std for full dataset (can be reused wth new data at prediction time)
 		self.x_std = x.std(0)
 		self.x_mean = x.mean(0)
@@ -180,14 +183,15 @@ class SuperLearner(object):
 					x_train_poly = poly.fit_transform(x_train)
 					x_test_poly = poly.fit_transform(x_test)
 					if ((self.output == 'cls') or (
-							self.output == 'proba') or (self.output == 'cat')):
-						est = CalibratedClassifierCV(base_estimator=est, cv=8)
+							self.output == 'proba') or (self.output == 'cat')) and self.calibration:
+						est = CalibratedClassifierCV(base_estimator=est, cv=5)
 					est.fit(x_train_poly, y_train)
 
 				else:
 					if ((self.output == 'cls') or (
-							self.output == 'proba') or (self.output == 'cat')):
-						est = CalibratedClassifierCV(base_estimator=est, cv=8)
+							self.output == 'proba') or (self.output == 'cat')) and self.calibration:
+						est = CalibratedClassifierCV(base_estimator=est, cv=5)
+
 					est.fit(x_train, y_train)
 
 				p = est.predict(x_test_poly) if key == 'poly' else est.predict(x_test)
@@ -233,6 +237,7 @@ class SuperLearner(object):
 
 	def predict(self, x):
 		x = x.values.astype('float') if isinstance(x, pd.DataFrame) else x
+		x = x.values.astype('float') if isinstance(x, pd.Series) else x
 		x_ = (x - self.x_mean) / self.x_std
 		all_preds = np.zeros((len(x_), self.num_learners))
 		i = 0
@@ -257,7 +262,7 @@ class SuperLearner(object):
 
 	def predict_proba(self, x):
 		x = x.values.astype('float') if isinstance(x, pd.DataFrame) else x
-
+		x = x.values.astype('float') if isinstance(x, pd.Series) else x
 		x_ = (x - self.x_mean) / self.x_std
 
 		all_preds = np.zeros((len(x), self.num_classes, self.num_learners))
