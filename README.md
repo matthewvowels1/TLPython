@@ -8,52 +8,109 @@ Uses Super Learners [5] for outcome and treatment/nuisance parameter models.
 
 
 ```python
+import numpy as np
+import pandas as pd
 from TLP import TLP
-from helper import generate_data
+import scipy
+from scipy.special import logit, expit
 
-# NOTE: THE GROUP NAMES FOR THE TREATMENT MUST BE INDEXED WITH INTEGERS STARTING FROM 0
 
-est_dict_Q = ['Elastic', 'BR', 'SV', 'LR', 'RF', 'MLP', 'AB', 'poly']
+def gen_data(N):  # following example in https://migariane.github.io/TMLE.nb.html
+    w1 = np.random.binomial(1, 0.5, size=N)
+    w2 = np.random.binomial(1, 0.65, size=N)
+    w3 = np.round(np.random.uniform(0,4, N), 3)
+    w4 = np.round(np.random.uniform(0,5, N), 3)
+    ua = expit(-0.4 + 0.2* w2 + 0.15 * w3 + 0.2 * w4 + 0.15 * w2 * w4)
+    A = np.random.binomial(1, ua, size=N)
+    uy1 = expit(-1 + 1 - 0.1*w1 + 0.3 * w2 + 0.25 * w3 + 0.2*w4 + 0.15*w2*w4)
+    uy0 = expit(-1 + 0 - 0.1*w1 + 0.3 * w2 + 0.25 * w3 + 0.2*w4 + 0.15*w2*w4)
+    Y1 = np.random.binomial(1, uy1, size=N)
+    Y0 = np.random.binomial(1, uy0, size=N)
+    Y = Y1*A + Y0*(1-A)
+    cols = ['w1', 'w2', 'w3', 'w4', 'A', 'Y', 'Y1', 'Y0']
+    df = pd.DataFrame([w1, w2, w3, w4, A, Y, Y1, Y0]).T
+    df.columns = cols
+    
+    return df
+
+df = gen_data(100000)
+
+true_psi = (df['Y1'] - df['Y0']).mean()
+print('TRUE EFFECT', true_psi)
+true_sd = scipy.stats.sem(df['Y1'] - df['Y0'])
+print('TRUE SE', true_sd)
+
+df = gen_data(1000)
+sample_psi = (df['Y1'] - df['Y0']).mean()
+print('SAMPLE EFFECT', sample_psi)
+sample_sd = scipy.stats.sem(df['Y1'] - df['Y0'])
+print('SAMPLE SE', sample_sd)
+cols = df.columns
+
+print(cols, len(cols))
+
+# standardize the data for causal discovery
+df = df.drop(['Y1', 'Y0'], 1)
+cols = df.columns
+print(cols, len(cols))
+
+outcome = 'Y'
+cause = 'A'
+confs = ['w1', 'w2', 'w3', 'w4']
+precs = []
+
+# step 2
 est_dict_G = ['LR', 'NB', 'MLP','SV', 'poly', 'RF','AB']
+est_dict_Q = ['LR', 'NB', 'MLP','SV', 'poly', 'RF','AB']
 
-'''
-BR = bayesian ridge (reg)
-Elastic = elastic net (reg)
-SV = support vector (reg/cls)
-LR = linear/logistic regression (reg/cls)
-RF = random forest (reg/cls)
-MLP = multilayer perceptron (reg/cls)
-AB = adaboost (reg/cls)
-poly = polynomial linear/logistic regression (reg/cls)
-NB = Gaussian Naive Bayes (cls)'''
+# step 3
+i = 0
 
-outcome_type = 'reg'   # cls or reg
-treatment_type = 'multigroup' # binary or multigroup
-N = 600
-group_comparisons =[[1,0],[2,0],[3,0]]  # comparison in list format with 'group A [vs] reference_group'
-k = 8  # number of folds for SL training
+# step 4
+print('outcome: ', outcome, '. cause: ', cause, '. Confounders:', confs, '. Precisions:', precs, '\n')
 
+# step 5
+outcome_type = 'cls'  # 'reg' or 'cls'
 
-data = generate_data(N=N, outcome_type=outcome_type, treatment_type=treatment_type)  # example function in ipynb
+# step 6
+group_comparisons =[[1,0]]  # comparison in list format with 'group B [vs] reference_group'
 
-true_psi_1_0 = data.Y1.mean() - data.Y0.mean()
-true_psi_2_0 = data.Y2.mean() - data.Y0.mean()
-true_psi_3_0 = data.Y3.mean() - data.Y0.mean()
+# step 7
+k = 5  # number of folds for SL training
 
-# initialise TLP object
-tlp = TLP(data, cause='A', outcome='Y', confs=['W1', 'W2', 'W3', 'W4'],
-          precs=[], outcome_type=outcome_type, Q_learners=est_dict_Q, G_learners=est_dict_G)
+# step 8
+tlp = TLP(df, cause=cause, outcome=outcome, confs=list(confs),
+          precs=list(precs), outcome_type=outcome_type, Q_learners=est_dict_Q, G_learners=est_dict_G,
+         outcome_upper_bound=None, outcome_lower_bound=None)
 
+# step 9 
+ # fit SuperLearners
+all_preds_Q, gs_Q, all_preds_G, gts_G = tlp.fit(k=k, standardized_outcome=False, calibrationQ=True, calibrationG=False)
 
-# fit SuperLearners
-all_preds_Q, gts_Q, all_preds_G, gts_G = tlp.fit(k=k, standardized_outcome=False, calibration=True)
-
-# 'do' targeted learning, NB ses contains a tuple of (standard error, upper bound CI, lower bound CI)
+# step 9 
+# 'do' targeted learning
 pre_update_effects, post_update_effects, ses, ps = tlp.target_multigroup(group_comparisons=group_comparisons)
+# step 11
+# 'do' doubly robust inference targeted learning [10.]
+pre_update_effects_dr, post_update_effects_dr, ses_dr, ps_dr = tlp.dr_target_multigroup(group_comparisons=group_comparisons, k=5, iterations=10)
 
-# compare results
-print(post_update_effects)
-print(true_psi_1_0, true_psi_2_0, true_psi_3_0)
+print(' REGULAR TARGETED LEARNING---------')
+
+print('TRUE', true_psi)
+print('SAMPLE', sample_psi)
+
+print('Pre-update error:', np.abs(sample_psi - pre_update_effects['[1, 0]']))
+print('Post-update error:', np.abs(sample_psi - post_update_effects['[1, 0]']))
+
+print('TRUE SE:', true_sd)
+print('SAMPLE SE:', sample_sd )
+print('EST SE:', ses['[1, 0]'][0])
+
+print('\n DOUBLE TARGETED LEARNING---------')
+
+print('Pre-update error:', np.abs(sample_psi - pre_update_effects_dr['[1, 0]']))
+print('Post-update error:', np.abs(sample_psi - post_update_effects_dr['[1, 0]']))
+print('EST SE:', ses_dr['[1, 0]'][0])
 ```
 
 
@@ -63,12 +120,6 @@ print(true_psi_1_0, true_psi_2_0, true_psi_3_0)
 - Highly Adaptive Lasso [6]
 
 
-### Assumed Graph:
-
-![Fig. 1](https://github.com/matthewvowels1/TLPython/blob/main/dag.png)
-
-Note that in the absence of the arrow X -> A (i.e. confounder to treatment assignment) we default to esimtation of the conditional outcome mean difference, 
-for which the influence function takes a similar form (see [9] for a derivation).
 
 ### References
 [1.] Van der Laan, M. J., & Rose, S. (2011). Targeted learning: causal inference for observational and experimental data (Vol. 4). New York: Springer
@@ -88,4 +139,7 @@ for which the influence function takes a similar form (see [9] for a derivation)
 [8.] van der Laan, M. J., & Gruber, S. (2012). Targeted minimum loss based estimation of causal effects of multiple time point interventions. The international journal of biostatistics, 8(1).
 
 [9.] Hines, O., Dukes, O., Diaz-Ordaz, K., & Vansteelandt, S. (2022). Demystifying statistical learning based on efficient influence functions. The American Statistician, 1-13.
+
+[10.] Benkeser, D. Carone, M. van der Laan, M.J. & Gilbert, P.B. (2017) Doubly robust nonparametric inference on the average treatment effect. Biometrika 104(4) 863-880
+
 
