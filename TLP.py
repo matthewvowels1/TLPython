@@ -19,7 +19,8 @@ class TLP(object):
 	::param Q_learners: a list of strings for the abbreviations of the learners to be included in the outcome Q SL
 	::param G_learners: a list of strings for the abbreviations of the learners to be included in the treatment G SL
 	::param outcome_type: a string 'reg' or 'cls' incicating whether the outcome is binary or continuous
-	::param: outcome_upper_bound, outcome_lower_bound: floats for the upper and lower bound of the outcomes for rescaling to [0,1]
+	::param outcome_upper_bound, outcome_lower_bound: floats for the upper and lower
+	        bound of the outcomes for rescaling to [0,1]
 	'''
 
 	def __init__(self, data, cause, outcome, confs, precs, Q_learners, G_learners, outcome_type='reg',
@@ -98,14 +99,14 @@ class TLP(object):
 	def fit(self, k, standardized_outcome=False, calibrationQ=False, calibrationG=False):
 		'''Fits the superlearners
 		::param k: the number of folds to use in k-fold cross-validation
-		::param standardized_outcome: whether to standardize the outcome (only applicable to continuous outcomes)
+		::param standardized_outcome: whether to standardize the outcome (only applicable to continuous outcomes).
+				Note that the standardized outcome is not the same as the outcome bounding used in the submodel update step
 		::param calibration: whether to calibrate the classifiers (not applicable to regressors)
 		::returns all_preds_Q, gts_Q, all_preds_G, gts_G: arrays of test-fold predictions and GT for Q and G models
 		'''
 
 
 		print('Training Q Learners...')
-
 
 		self.qslr = SuperLearner(output=self.outcome_type, calibration=calibrationQ, learner_list=self.Q_learners, k=k,
 		                         standardized_outcome=standardized_outcome, seed=self.seed)
@@ -115,7 +116,8 @@ class TLP(object):
 		print('Generating QAW Predictions ')
 		QAW = self.qslr.predict(self.Q_X)[:, 0] if self.outcome_type == 'reg' else self.qslr.predict_proba(
 			self.Q_X)[:, 1]
-		self.QAW = np.clip(QAW, 0.005, 0.995) if (self.outcome_type == 'cls') or (self.outcome_upper_bound is not None) else QAW
+		self.QAW = np.clip(QAW, 0.005, 0.995) if (self.outcome_type == 'cls') or\
+		                                         (self.outcome_upper_bound is not None) else QAW
 
 		if self.outcome_upper_bound is not None and self.outcome_type == 'reg':
 			print('Bounding outcome predictions.')
@@ -177,9 +179,9 @@ class TLP(object):
 			eps_ref = sm.GLM(np.asarray(Y).astype('float'), clev_cov_ref, offset=QAW).fit().params[0]
 
 		if self.outcome_type == 'cls' or self.outcome_upper_bound is not None:
-			Q_group_a = (expit(logit(Q_group_a) + eps_a * clev_cov_a))
-			Q_group_ref = (expit(logit(Q_group_ref) + eps_ref * clev_cov_ref))
-			QAW_st = (expit(logit(QAW) + eps_group * clev_cov_AW))
+			Q_group_a = np.clip((expit(logit(np.clip(Q_group_a, 0.005, 0.995)) + eps_a * clev_cov_a)), 0.005, 0.995)
+			Q_group_ref = np.clip((expit(logit(np.clip(Q_group_ref, 0.005, 0.995)) + eps_ref * clev_cov_ref)), 0.005, 0.995)
+			QAW_st = np.clip((expit(logit(np.clip(QAW, 0.005, 0.995)) + eps_group * clev_cov_AW)), 0.005, 0.995)
 		else:
 			Q_group_a = Q_group_a + eps_a * clev_cov_a
 			Q_group_ref = Q_group_ref + eps_ref * clev_cov_ref
@@ -248,8 +250,8 @@ class TLP(object):
 					                   offset=QAW).fit()).params[0]
 
 				if self.outcome_type == 'cls' or self.outcome_upper_bound is not None:
-					Q_group_a = (expit(logit(Q_group_a) + eps_ps_a * H2nk_a))
-					Q_group_ref = (expit(logit(Q_group_ref) + eps_ps_ref * H2nk_ref))
+					Q_group_a = np.clip((expit(logit(Q_group_a) + eps_ps_a * H2nk_a)), 0.005, 0.995)
+					Q_group_ref = np.clip((expit(logit(Q_group_ref) + eps_ps_ref * H2nk_ref)), 0.005, 0.995)
 
 				else:
 					Q_group_a = Q_group_a + eps_ps_a * H2nk_a
@@ -342,7 +344,8 @@ class TLP(object):
 			qps = self.qslr.predict(int_data)[:,
 			                           0] if self.outcome_type == 'reg' else self.qslr.predict_proba(int_data)[:, 1]
 
-			self.Qpred_groups[group] = np.clip(qps, 0.005, 0.995) if (self.outcome_type == 'cls') or (self.outcome_upper_bound is not None) else qps
+			self.Qpred_groups[group] = np.clip(qps, 0.005, 0.995) if (self.outcome_type == 'cls') or\
+			                                                         (self.outcome_upper_bound is not None) else qps
 
 	def _group_diffs(self, group_comparisons):
 		# GROUP DIFFERENCES
@@ -427,11 +430,16 @@ class TLP(object):
 	def _computing_IF(self, group_comparisons, dr_flag=False):
 		# COMPUTING THE IF
 		for group_comparison in group_comparisons:
-			clev_cov_group = self.clev_covs[str(group_comparison)][0] if not dr_flag else self.clev_covs_dr[str(group_comparison)][0]
-			ystar_a = self.updated_estimates[str(group_comparison)][0] if not dr_flag else self.updated_estimates_dr[str(group_comparison)][0]
-			ystar_ref = self.updated_estimates[str(group_comparison)][1] if not dr_flag else self.updated_estimates_dr[str(group_comparison)][1]
-			QAW_st = self.updated_estimates[str(group_comparison)][2]  if not dr_flag else self.updated_estimates_dr[str(group_comparison)][2]
-			effect_star = self.updated_effects[str(group_comparison)] if not dr_flag else self.updated_effects_dr[str(group_comparison)]
+			clev_cov_group = self.clev_covs[str(group_comparison)][0] if not \
+				dr_flag else self.clev_covs_dr[str(group_comparison)][0]
+			ystar_a = self.updated_estimates[str(group_comparison)][0] if not \
+				dr_flag else self.updated_estimates_dr[str(group_comparison)][0]
+			ystar_ref = self.updated_estimates[str(group_comparison)][1] if not \
+				dr_flag else self.updated_estimates_dr[str(group_comparison)][1]
+			QAW_st = self.updated_estimates[str(group_comparison)][2] if not \
+				dr_flag else self.updated_estimates_dr[str(group_comparison)][2]
+			effect_star = self.updated_effects[str(group_comparison)] if not \
+				dr_flag else self.updated_effects_dr[str(group_comparison)]
 			IC = clev_cov_group * (self.Q_Y.values - QAW_st) + (ystar_a - ystar_ref) - effect_star
 			se, p, upper_bound, lower_bound = self._inference(ic=IC, effect=effect_star)
 			if dr_flag:
