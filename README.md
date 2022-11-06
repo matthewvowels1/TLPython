@@ -119,7 +119,7 @@ print('EST SE:', ses_dr['[1, 0]'][0])
 
 - Longitudinal (following G-computation/estimation) [7,8]
 - Highly Adaptive Lasso [6]
-
+- Continuous treatment/exposure 
 
 
 ### References
