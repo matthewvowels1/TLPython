@@ -3,6 +3,7 @@ Targeted Learning [1,2,3,4] for estimation of the Average Causal/Treatment Effec
 
 Uses Super Learners [5] for outcome and treatment/nuisance parameter models.
 
+Includes doubly robust statistical inference option [10] in function ```TLP.dr_target_multigroup```
 
 ## Example Usage:
 
@@ -116,7 +117,7 @@ print('EST SE:', ses_dr['[1, 0]'][0])
 
 ### Outstanding Work
 
-- Longitudinal (followin G-computation/estimation) [7,8]
+- Longitudinal (following G-computation/estimation) [7,8]
 - Highly Adaptive Lasso [6]
 
 
