@@ -54,6 +54,7 @@ class TLP(object):
 
 		if (self.outcome_upper_bound is not None) and (self.outcome_type == 'reg'):
 			self.Q_Y = (self.Q_Y - self.outcome_lower_bound) / (self.outcome_upper_bound - self.outcome_lower_bound)
+			self.Q_Y = np.clip(self.Q_Y, 0.005, 0.995)  # bound away from 0 and 1
 
 		self.groups = np.unique(self.A)
 
