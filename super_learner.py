@@ -100,7 +100,7 @@ class SuperLearner(object):
 				else:
 					est_dict[learner] = RandomForestRegressor()
 
-			elif learner == 'BR' or 'NB':
+			elif (learner == 'BR') or (learner == 'NB'):
 				if ((self.output == 'cls') or (
 						self.output == 'proba') or (self.output == 'cat')):
 					est_dict[learner] = GaussianNB()
